@@ -1,3 +1,5 @@
+use std::any::Any;
+use std::cmp::PartialEq;
 use std::f64::consts::PI;
 use std::net::ToSocketAddrs;
 use crate::shapes::Features::SawtoothFeature;
@@ -17,10 +19,8 @@ pub enum Features {
     NotchFeature,
     SawtoothFeature,
     ClawFeature,
-    ValleyFeature,
-    SinkholeFeature,
-    CaveFeature,
-
+    CompositeSlopeFeature,
+    
     ArcFeature,
     EllipseFeature,
 
@@ -40,9 +40,7 @@ impl Features {
             Features::NotchFeature => { "notch".to_string() }
             Features::SawtoothFeature => { "sawtooth".to_string() }
             Features::ClawFeature => { "claw".to_string() }
-            Features::ValleyFeature => { "valley".to_string() }
-            Features::SinkholeFeature => { "sinkhole".to_string() }
-            Features::CaveFeature => { "cave".to_string() }
+            Features::CompositeSlopeFeature => { "composite slope".to_string() }
             Features::ArcFeature => { "arc".to_string() }
             Features::EllipseFeature => { "ellipse".to_string() }
             Features::OtherFeatureFeature => { "other feature".to_string() }
@@ -109,28 +107,13 @@ impl Features {
                 steps.push(FeatureAdditionStep::new("angle".to_string()));
                 steps.push(FeatureAdditionStep::new("count".to_string()));
             }
-
-            Features::ValleyFeature => {
-                steps.push(FeatureAdditionStep::new("height 1".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 1".to_string()));
-                steps.push(FeatureAdditionStep::new("height 2".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 2".to_string()));
-                steps.push(FeatureAdditionStep::new("count".to_string()));
-            }
-
-            Features::SinkholeFeature => {
-                steps.push(FeatureAdditionStep::new("height 1".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 1".to_string()));
-                steps.push(FeatureAdditionStep::new("height 2".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 2".to_string()));
-                steps.push(FeatureAdditionStep::new("count".to_string()));
-            }
-
-            Features::CaveFeature => {
-                steps.push(FeatureAdditionStep::new("height 1".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 1".to_string()));
-                steps.push(FeatureAdditionStep::new("height 2".to_string()));
-                steps.push(FeatureAdditionStep::new("angle 2".to_string()));
+            
+            Features::CompositeSlopeFeature => {
+                steps.push(FeatureAdditionStep::new("height".to_string()));
+                steps.push(FeatureAdditionStep::new("angle".to_string()));
+                steps.push(FeatureAdditionStep::new("slope type".to_string()));
+                steps.push(FeatureAdditionStep::new("slope direction".to_string()));
+                steps.push(FeatureAdditionStep::new("slope id".to_string()));
                 steps.push(FeatureAdditionStep::new("count".to_string()));
             }
 
@@ -159,12 +142,20 @@ impl Features {
         FeatureAdditionPath::new(self.clone(), self.steps())
     }
 }
+impl PartialEq for Features {
+    fn eq(&self, other: &Self) -> bool {
+        self.name() == other.name()
+    }
+}
 
 
 /// Used to define features that can be added to the main Body.
 pub trait Feature {
     /// Returns the type of the feature.
     fn shape(&self) -> Features;
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any;
 
     /// Returns how many of the feature there are.
     fn count(&self) -> usize;
@@ -209,7 +200,7 @@ impl FeatureAdditionPath {
 
     /// Returns the current step's field.
     pub fn current_step_value(&self) -> String { self.steps[self.current_step].field.clone() }
-    
+
     /// Updates the current step's value input.
     pub fn update_current_step_value_input(&mut self, new_value_input: String) { self.steps[self.current_step].update_value_input(new_value_input); }
 
@@ -294,31 +285,20 @@ impl FeatureAdditionPath {
                 Box::new(Claw::new(height, angle, count))
             }
 
-            Features::ValleyFeature => {
-                let height_1 = self.steps[0].value;
-                let angle_1 = self.steps[1].value;
-                let height_2 = self.steps[2].value;
-                let angle_2 = self.steps[3].value;
-                let count = self.steps[4].value as usize;
-                Box::new(Valley::new(height_1, angle_1, height_2, angle_2, count))
-            }
-
-            Features::SinkholeFeature => {
-                let height_1 = self.steps[0].value;
-                let angle_1 = self.steps[1].value;
-                let height_2 = self.steps[2].value;
-                let angle_2 = self.steps[3].value;
-                let count = self.steps[4].value as usize;
-                Box::new(Sinkhole::new(height_1, angle_1, height_2, angle_2, count))
-            }
-
-            Features::CaveFeature => {
-                let slope_height = self.steps[0].value;
-                let slope_angle = self.steps[1].value;
-                let cliff_height = self.steps[2].value;
-                let cliff_angle = self.steps[3].value;
-                let count = self.steps[4].value as usize;
-                Box::new(Cave::new(slope_height, slope_angle, cliff_height, cliff_angle, count))
+            Features::CompositeSlopeFeature => {
+                let height = self.steps[0].value;
+                let angle = self.steps[1].value;
+                let slope_type = match self.steps[2].value as i32 {
+                    0 => SlopeType::Convex,
+                    _ => SlopeType::Concave,
+                };
+                let slope_direction = match self.steps[3].value as i32 {
+                    0 => SlopeDirection::Up,
+                    _ => SlopeDirection::Down,
+                };
+                let slope_id = self.steps[4].value as usize;
+                let count = self.steps[5].value as usize;
+                Box::new(CompositeSlope::new(height, angle, slope_type, slope_direction, slope_id, count))
             }
 
             Features::ArcFeature => {
@@ -397,9 +377,20 @@ impl Body {
     /// Gets the full perimeter of the body with all of its features.
     pub fn perimeter(&self) -> f64 {
         let mut perimeter = (self.width + self.height) * 2.0;
+
+        let mut composite_slope_index = CompositeSlopeIndex::new();
+
         for feature in &self.features {
-            perimeter += feature.value();
+            if let Some(composite_slope) = feature.as_any().downcast_ref::<CompositeSlope>() {
+                composite_slope_index.add_height(composite_slope.height, composite_slope.slope_direction, composite_slope.slope_id);
+            }
+            else {
+                perimeter += feature.value();
+            }
         }
+
+        perimeter -= composite_slope_index.get_height_differences();
+
         perimeter
     }
 
@@ -428,6 +419,11 @@ impl CircularHole {
 impl Feature for CircularHole {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::CircularHoleFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -463,6 +459,11 @@ impl CapsularHole {
 impl Feature for CapsularHole {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::CapsularHoleFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -500,6 +501,11 @@ impl Feature for RectangularHole {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::RectangularHoleFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -534,6 +540,11 @@ impl Feature for Fillet {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::FilletFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -566,6 +577,11 @@ impl Chamfer {
 impl Feature for Chamfer {
     /// The name of the feature.
     fn shape(&self) -> Features { Features::ChamferFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -601,6 +617,11 @@ impl Slope {
 impl Feature for Slope {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::SlopeFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -638,6 +659,11 @@ impl Feature for Cliff {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::CliffFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -671,6 +697,11 @@ impl Notch {
 impl Feature for Notch {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::NotchFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -706,6 +737,11 @@ impl Sawtooth {
 impl Feature for Sawtooth {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::SawtoothFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -743,6 +779,11 @@ impl Feature for Claw {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::ClawFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -762,26 +803,104 @@ impl Feature for Claw {
 
 
 
-/// A cutout that slopes inward on both sides (2x slopes).
-pub struct Valley {
-    /// The height of the first slope.
-    height_1: f64,
-    /// The angle of the first slope.
-    angle_1: f64,
-    /// The height of the second slope.
-    height_2: f64,
-    /// The angle of the second slope.
-    angle_2: f64,
-    /// How many valleys there are.
+/// Denotes which direction the slope is going in.
+#[derive(Clone, Copy)]
+pub enum SlopeDirection {
+    Up,
+    Down,
+}
+
+
+
+/// Denotes whether the slope is convex or concave.
+#[derive(Clone, Copy)]
+pub enum SlopeType {
+    Convex,
+    Concave,
+}
+
+
+
+/// Stores and automatically manages the height differences for various collections of composite slopes.
+pub struct CompositeSlopeIndex {
+    /// A collection of all the composite slope height trackers.
+    pub trackers: Vec<CompositeSlopeHeightTracker>
+}
+impl CompositeSlopeIndex {
+    /// Creates a new composite slope index.
+    pub fn new() -> Self { Self { trackers: Vec::new() } }
+
+    pub fn add_height(&mut self, height: f64, slope_direction: SlopeDirection, slope_id: usize) {
+        let tracker = self.trackers.iter_mut().find(|tracker| tracker.slope_id == slope_id);
+        if let Some(existing_tracker) = tracker {
+            existing_tracker.add_height(height, slope_direction);
+        } else {
+            let mut new_tracker = CompositeSlopeHeightTracker::new(slope_id);
+            new_tracker.add_height(height, slope_direction);
+            self.trackers.push(new_tracker);
+        }
+    }
+
+    pub fn get_height_differences(&self) -> f64 {
+        self.trackers.iter().map(|tracker| tracker.get_height_difference()).sum()
+    }
+}
+
+
+/// A height tracker for a single collection of composite slopes.
+pub struct CompositeSlopeHeightTracker {
+    /// The id of the collection of composite slopes.
+    slope_id: usize,
+    /// The difference in height from the series of composite slopes.
+    height_tracker: f64,
+}
+impl CompositeSlopeHeightTracker {
+    /// Creates a new height tracker for a collection of composite slopes.
+    pub fn new(slope_id: usize) -> Self { Self { slope_id, height_tracker: 0.0 } }
+
+    /// Adds a height to the height tracker, keeping track of the direction of the slope.
+    pub fn add_height(&mut self, height: f64, slope_direction: SlopeDirection) {
+        match slope_direction {
+            SlopeDirection::Up => self.height_tracker -= height,
+            SlopeDirection::Down => self.height_tracker += height,
+        }
+    }
+
+    /// Returns the difference in height from the last height tracker.
+    pub fn get_height_difference(&self) -> f64 { self.height_tracker.abs() }
+}
+
+
+
+/// A cutout that is a collection of individual composite slopes.
+/// These slopes are groups by id's with each id being meant to designate an entire complex slope or valley.
+pub struct CompositeSlope {
+    /// The height of the composite slope (only current section).
+    height: f64,
+    /// The angle of the sloped side of the composite slope.
+    angle: f64,
+    /// Determined whether the composite slope is convex or concave.
+    slope_type: SlopeType,
+    /// The direction of the composite slope.
+    /// Down goes into the body and Up goes out of the body.
+    slope_direction: SlopeDirection,
+    /// Slope id
+    slope_id: usize,
+    /// How many composite slopes there are.
     count: usize,
 }
-impl Valley {
-    /// Creates a new valley feature.
-    pub fn new(height_1: f64, angle_1: f64, height_2: f64, angle_2: f64, count: usize) -> Self { Self { height_1, angle_1, height_2, angle_2, count } }
+impl CompositeSlope {
+    /// Creates a new composite slope feature.
+    pub fn new(height: f64, angle: f64, slope_type: SlopeType, slope_direction: SlopeDirection, slope_id: usize, count: usize) -> Self { Self { height, angle, slope_type, slope_direction, slope_id, count } }
 }
-impl Feature for Valley {
+impl Feature for CompositeSlope {
     /// The type of the feature.
-    fn shape(&self) -> Features { Features::ValleyFeature }
+    fn shape(&self) -> Features { Features::CompositeSlopeFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -789,100 +908,17 @@ impl Feature for Valley {
     /// A basic dimension overview.
     fn summarize_dimensions(&self) -> String {
         let mut dims = "".to_string();
-        dims += &format!("height 1: {}, ", &format!("{:.3}", self.height_1));
-        dims += &format!("angle 1: {}, ", &format!("{:.3}", self.angle_1));
-        dims += &format!("height 2: {}, ", &format!("{:.3}", self.height_2));
-        dims += &format!("angle 2: {}", &format!("{:.3}", self.angle_2));
+        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
+        dims += &format!("angle: {}, ", &format!("{:.3}", self.angle));
+        dims += &format!("slope_type: {}, ", match self.slope_type { SlopeType::Convex => "convex", SlopeType::Concave => "concave" });
+        dims += &format!("slope_direction: {}, ", match self.slope_direction { SlopeDirection::Up => "up", SlopeDirection::Down => "down" });
+        dims += &format!("slope_id: {}", self.slope_id);
         dims
     }
 
     /// Gets the perimeter modification of the valley.
     fn value(&self) -> f64 {
-        formulas::valley_modification(self.height_1, self.angle_1, self.height_2, self.angle_2) * self.count as f64
-    }
-}
-
-
-
-/// A cutout that slopes backwards and downwards on both sides (2x claws).
-pub struct Sinkhole {
-    /// The height of the first slope.
-    height_1: f64,
-    /// The angle of the first slope.
-    angle_1: f64,
-    /// The height of the second slope.
-    height_2: f64,
-    /// The angle of the second slope.
-    angle_2: f64,
-    /// How many valleys there are.
-    count: usize,
-}
-impl Sinkhole {
-    /// Creates a new sinkhole feature.
-    pub fn new(height_1: f64, angle_1: f64, height_2: f64, angle_2: f64, count: usize) -> Self { Self { height_1, angle_1, height_2, angle_2, count } }
-}
-impl Feature for Sinkhole {
-    /// The type of the feature.
-    fn shape(&self) -> Features { Features::SinkholeFeature }
-
-    /// The count of the feature.
-    fn count(&self) -> usize { self.count }
-
-    /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height 1: {}, ", &format!("{:.3}", self.height_1));
-        dims += &format!("angle 1: {}, ", &format!("{:.3}", self.angle_1));
-        dims += &format!("height 2: {}, ", &format!("{:.3}", self.height_2));
-        dims += &format!("angle 2: {}", &format!("{:.3}", self.angle_2));
-        dims
-    }
-
-    /// Gets the perimeter modification of the valley.
-    fn value(&self) -> f64 {
-        formulas::sinkhole_modification(self.height_1, self.angle_1, self.height_2, self.angle_2) * self.count as f64
-    }
-}
-
-
-
-/// A cutout that slopes inward on one side (slope) and backwards and downwards on the other (claw).
-pub struct Cave {
-    /// The height of the first slope.
-    slope_height: f64,
-    /// The angle of the first slope.
-    slope_angle: f64,
-    /// The height of the second slope.
-    cliff_height: f64,
-    /// The angle of the second slope.
-    cliff_angle: f64,
-    /// How many valleys there are.
-    count: usize,
-}
-impl Cave {
-    /// Creates a new valley feature.
-    pub fn new(slope_height: f64, slope_angle: f64, cliff_height: f64, cliff_angle: f64, count: usize) -> Self { Self { slope_height, slope_angle, cliff_height, cliff_angle, count } }
-}
-impl Feature for Cave {
-    /// The type of the feature.
-    fn shape(&self) -> Features { Features::CaveFeature }
-
-    /// The count of the feature.
-    fn count(&self) -> usize { self.count }
-
-    /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height 1: {}, ", &format!("{:.3}", self.slope_height));
-        dims += &format!("angle 1: {}, ", &format!("{:.3}", self.slope_angle));
-        dims += &format!("height 2: {}, ", &format!("{:.3}", self.cliff_height));
-        dims += &format!("angle 2: {}", &format!("{:.3}", self.cliff_angle));
-        dims
-    }
-
-    /// Gets the perimeter modification of the valley.
-    fn value(&self) -> f64 {
-        formulas::cave_modification(self.slope_height, self.slope_angle, self.cliff_height, self.cliff_angle) * self.count as f64
+        formulas::claw_modification(self.height, self.angle) * self.count as f64
     }
 }
 
@@ -904,6 +940,11 @@ impl Arc {
 impl Feature for Arc {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::ArcFeature }
+
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
@@ -941,6 +982,11 @@ impl Feature for Ellipse {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::EllipseFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -975,6 +1021,11 @@ impl Feature for OtherFeature {
     /// The type of the feature.
     fn shape(&self) -> Features { Features::OtherFeatureFeature }
 
+    /// Allows type-specific field access
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
     /// The count of the feature.
     fn count(&self) -> usize { self.count }
 
@@ -992,6 +1043,7 @@ impl Feature for OtherFeature {
 /// A collection of perimeter modification formulas for various features.
 pub mod formulas {
     use std::f64::consts::PI;
+    use crate::shapes::SlopeType;
 
     /// Calculates the perimeter modification for a circular hole.
     pub fn circular_hole_modification(diameter: f64) -> f64 {
@@ -1023,13 +1075,13 @@ pub mod formulas {
     /// Calculates the perimeter modification for a slope.
     pub fn slope_modification(height: f64, angle: f64) -> f64 {
         let rad_angle = angle.to_radians();
-        ((1.0 / rad_angle.sin()) - (1.0 / rad_angle.tan())) * height
+        ((1.0 / rad_angle.sin()) - (1.0 / rad_angle.tan()) - 1.0) * height
     }
 
     /// Calculates the perimeter modification for a cliff.
     pub fn cliff_modification(height: f64, angle: f64) -> f64 {
         let rad_angle = angle.to_radians();
-        ((1.0 / rad_angle.sin()) + (1.0 / rad_angle.tan())) * height
+        ((1.0 / rad_angle.sin()) + (1.0 / rad_angle.tan()) - 1.0) * height
     }
 
 
@@ -1048,20 +1100,14 @@ pub mod formulas {
     pub fn claw_modification(height: f64, angle: f64) -> f64 {
         cliff_modification(height, angle) + height
     }
-
-    /// Calculates the perimeter modification for a valley.
-    pub fn valley_modification(height_1: f64, angle_1: f64, height_2: f64, angle_2: f64) -> f64 {
-        slope_modification(height_1, angle_1) + slope_modification(height_2, angle_2)
-    }
-
-    /// Calculates the perimeter modification for a sinkhole.
-    pub fn sinkhole_modification(height_1: f64, angle_1: f64, height_2: f64, angle_2: f64) -> f64 {
-        cliff_modification(height_1, angle_1) + cliff_modification(height_2, angle_2)
-    }
-
-    /// Calculates the perimeter modification for a cave.
-    pub fn cave_modification(slope_height: f64, slope_angle: f64, cliff_height: f64, cliff_angle: f64) -> f64 {
-        slope_modification(slope_height, slope_angle) + cliff_modification(cliff_height, cliff_angle)
+    
+    /// Calculates the perimeter modification for a composite slope.
+    pub fn composite_slope_modification(height: f64, angle: f64, slope_type: SlopeType) -> f64 {
+        let rad_angle = angle.to_radians();
+        match slope_type {
+            SlopeType::Convex => { ((1.0 / rad_angle.sin()) - (1.0 / rad_angle.tan())) * height }
+            SlopeType::Concave => { ((1.0 / rad_angle.sin()) + (1.0 / rad_angle.tan())) * height }
+        }
     }
 
 
