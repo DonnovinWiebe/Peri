@@ -175,9 +175,7 @@ impl Instruction {
     fn add_notch_instruction() -> Instruction { Instruction::new("1".to_string(), "add notch".to_string()) }
     fn add_sawtooth_instruction() -> Instruction { Instruction::new("2".to_string(), "add sawtooth".to_string()) }
     fn add_claw_instruction() -> Instruction { Instruction::new("3".to_string(), "add claw".to_string()) }
-    fn add_valley_instruction() -> Instruction { Instruction::new("4".to_string(), "add valley".to_string()) }
-    fn add_sinkhole_instruction() -> Instruction { Instruction::new("5".to_string(), "add sinkhole".to_string()) }
-    fn add_cave_instruction() -> Instruction { Instruction::new("6".to_string(), "add cave".to_string()) }
+    fn add_composite_slope_instruction() -> Instruction { Instruction::new("4".to_string(), "add composite slope".to_string()) }
     //      circular
     fn add_circular_feature_instruction() -> Instruction { Instruction::new("3".to_string(), "add circular feature".to_string()) }
     fn add_arc_instruction() -> Instruction { Instruction::new("1".to_string(), "add arc".to_string()) }
@@ -238,9 +236,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
             instructions.push(Line::raw(Instruction::add_notch_instruction().printed()));
             instructions.push(Line::raw(Instruction::add_sawtooth_instruction().printed()));
             instructions.push(Line::raw(Instruction::add_claw_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_valley_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_sinkhole_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_cave_instruction().printed()));
+            instructions.push(Line::raw(Instruction::add_composite_slope_instruction().printed()));
             instructions.push(Line::raw(Instruction::add_arc_instruction().printed()));
             instructions.push(Line::raw(Instruction::add_ellipse_instruction().printed()));
             instructions.push(Line::raw(Instruction::cancel_instruction().printed()));

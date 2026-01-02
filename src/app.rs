@@ -278,16 +278,8 @@ impl App {
                                 self.start_adding_feature(Features::ClawFeature);
                                 continue;
                             }
-                            keybinds::CREATE_VALLEY_FEATURE => {
-                                self.start_adding_feature(Features::ValleyFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_SINKHOLE_FEATURE => {
-                                self.start_adding_feature(Features::SinkholeFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_CAVE_FEATURE => {
-                                self.start_adding_feature(Features::CaveFeature);
+                            keybinds::CREATE_COMPOSITE_SLOPE_FEATURE => {
+                                self.start_adding_feature(Features::CompositeSlopeFeature);
                                 continue;
                             }
                             _ => {}
@@ -477,9 +469,7 @@ pub mod keybinds {
     pub const CREATE_NOTCH_FEATURE: KeyCode = KeyCode::Char('1');
     pub const CREATE_SAWTOOTH_FEATURE: KeyCode = KeyCode::Char('2');
     pub const CREATE_CLAW_FEATURE: KeyCode = KeyCode::Char('3');
-    pub const CREATE_VALLEY_FEATURE: KeyCode = KeyCode::Char('4');
-    pub const CREATE_SINKHOLE_FEATURE: KeyCode = KeyCode::Char('5');
-    pub const CREATE_CAVE_FEATURE: KeyCode = KeyCode::Char('6');
+    pub const CREATE_COMPOSITE_SLOPE_FEATURE: KeyCode = KeyCode::Char('4');
     //      circular features
     pub const SHOW_CIRCULAR_FEATURES: KeyCode = KeyCode::Char('3');
     pub const CREATE_ARC_FEATURE: KeyCode = KeyCode::Char('1');
