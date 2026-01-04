@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::io::Result;
 use std::string::String;
 use ratatui::backend::Backend;

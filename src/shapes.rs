@@ -1,6 +1,5 @@
 use std::any::Any;
 use std::cmp::PartialEq;
-use std::net::ToSocketAddrs;
 use ratatui::text::Line;
 
 /// The list of possible features.
@@ -182,7 +181,7 @@ pub trait Feature {
     }
 
     /// Returns the perimeter modification of the feature.
-    /// The perimeter modification is the difference in body's overall perimeter that this feature will create.
+    /// The perimeter modification is the difference in the body's overall perimeter that this feature will create.
     fn value(&self) -> f64;
 }
 
