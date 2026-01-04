@@ -1,13 +1,12 @@
-use std::collections::HashMap;
 use std::error::Error;
 use std::io::Result;
 use std::string::String;
 use ratatui::backend::Backend;
 use ratatui::crossterm::event;
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
+use ratatui::crossterm::event::Event;
 use ratatui::Terminal;
 use crate::shapes::*;
-use crate::ui::ui;
+use crate::ui::{ui, Instruction};
 
 pub enum Pages {
     Launching, // c
@@ -88,13 +87,17 @@ impl App {
 
                     Pages::AddingBody => {
                         // quits
-                        self.try_quit(key);
+                        if key.code == Instruction::quit_instruction().keybind {
+                            self.current_page = Pages::Quitting;
+                            continue;
+                        }
 
                         // cancels/resets
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.new_body_name = "".to_string();
                             self.new_body_width = "".to_string();
                             self.new_body_height = "".to_string();
+                            self.is_name_set = false;
                             self.is_width_set = false;
                             self.is_height_set = false;
                             continue;
@@ -103,7 +106,7 @@ impl App {
                         // edits the new body name
                         if !self.is_name_set {
                             self.new_body_name = term_tools::keypad(&self.new_body_name, key);
-                            if key.code == keybinds::CONFIRM {
+                            if key.code == Instruction::confirm_instruction().keybind {
                                 if self.new_body_name.is_empty() { continue; }
                                 self.is_name_set = true;
                                 continue;
@@ -113,7 +116,7 @@ impl App {
                         // edits the new width before the height
                         if !self.is_width_set && self.is_name_set {
                             self.new_body_width = term_tools::numpad(&self.new_body_width, key);
-                            if key.code == keybinds::CONFIRM {
+                            if key.code == Instruction::confirm_instruction().keybind {
                                 if self.new_body_width.parse::<f64>().unwrap_or(0.0) <= 0.0 { continue; }
                                 self.is_width_set = true;
                                 continue;
@@ -123,7 +126,7 @@ impl App {
                         // edits the new height if the new width is set
                         if !self.is_height_set && self.is_name_set && self.is_width_set {
                             self.new_body_height = term_tools::numpad(&self.new_body_height, key);
-                            if key.code == keybinds::CONFIRM {
+                            if key.code == Instruction::confirm_instruction().keybind {
                                 if self.new_body_height.parse::<f64>().unwrap_or(0.0) <= 0.0 { continue; }
                                 self.is_height_set = true;
                                 //continue;
@@ -143,52 +146,76 @@ impl App {
 
                     Pages::BodyView => {
                         // quits
-                        self.try_quit(key);
+                        if key.code == Instruction::quit_instruction().keybind {
+                            self.current_page = Pages::Quitting;
+                            continue;
+                        }
 
-                        match key.code {
-                            keybinds::SHOW_HOLE_FEATURES => {
-                                self.current_page = Pages::ShowingHoleFeatureOptions;
-                                continue;
-                            }
-                            keybinds::SHOW_CORNER_FEATURES => {
-                                self.current_page = Pages::ShowingCornerFeatureOptions;
-                                continue;
-                            }
-                            keybinds::SHOW_CUTOUT_FEATURES => {
-                                self.current_page = Pages::ShowingCutoutFeatureOptions;
-                                continue;
-                            }
-                            keybinds::SHOW_CIRCULAR_FEATURES => {
-                                self.current_page = Pages::ShowingCircularFeatureOptions;
-                                continue;
-                            }
-                            keybinds::CREATE_OTHER_FEATURE => {
-                                self.start_adding_feature(Features::OtherFeatureFeature);
-                                continue;
-                            }
-                            keybinds::START_RENAMING_BODY => {
-                                self.is_name_set = false;
-                                self.current_page = Pages::RenamingBody;
-                                continue;
-                            }
-                            keybinds::START_REMOVING_FEATURE => {
-                                self.current_page = Pages::RemovingFeature;
-                                continue;
-                            }
-                            keybinds::START_FINISHING_BODY => {
-                                self.current_page = Pages::FinishingBody;
-                                continue;
-                            }
-                            _ => {}
+                        // resets
+                        else if key.code == Instruction::reset_instruction().keybind {
+                            self.new_body_name = "".to_string();
+                            self.new_body_width = "".to_string();
+                            self.new_body_height = "".to_string();
+                            self.is_name_set = false;
+                            self.is_width_set = false;
+                            self.is_height_set = false;
+                            self.body = Body::new();
+                            continue;
+                        }
+
+
+                        // shows hole feature options
+                        else if key.code == Instruction::add_hole_instruction().keybind {
+                            self.current_page = Pages::ShowingHoleFeatureOptions;
+                            continue;
+                        }
+
+                        // shows hole feature options
+                        else if key.code == Instruction::add_corner_instruction().keybind {
+                            self.current_page = Pages::ShowingCornerFeatureOptions;
+                            continue;
+                        }
+
+                        // shows hole feature options
+                        else if key.code == Instruction::add_cutout_instruction().keybind {
+                            self.current_page = Pages::ShowingCutoutFeatureOptions;
+                            continue;
+                        }
+
+                        // shows hole feature options
+                        else if key.code == Instruction::add_circular_feature_instruction().keybind {
+                            self.current_page = Pages::ShowingCircularFeatureOptions;
+                            continue;
+                        }
+
+                        // adds an undefined feature
+                        else if key.code == Instruction::add_other_feature_instruction().keybind {
+                            self.start_adding_feature(Features::OtherFeatureFeature);
+                            continue;
+                        }
+
+                        // renames a body
+                        else if key.code == Instruction::rename_instruction().keybind {
+                            self.current_page = Pages::RenamingBody;
+                            continue;
+                        }
+
+                        // removes a feature
+                        else if key.code == Instruction::remove_feature_instruction().keybind {
+                            self.current_page = Pages::RemovingFeature;
+                            continue;
+                        }
+
+                        // finishes the body
+                        else if key.code == Instruction::finish_instruction().keybind {
+                            self.current_page = Pages::FinishingBody;
+                            continue;
                         }
                     }
 
                     Pages::RenamingBody => {
-                        // quits
-                        self.try_quit(key);
-
                         // cancels/resets
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.is_name_set = true;
                             self.new_body_name = "".to_string();
                             continue;
@@ -198,7 +225,7 @@ impl App {
                         self.new_body_name = term_tools::keypad(&self.new_body_name, key);
 
                         // renames the body
-                        if key.code == keybinds::CONFIRM {
+                        if key.code == Instruction::confirm_instruction().keybind {
                             if self.new_body_name.is_empty() { continue; }
                             self.is_name_set = true;
                             self.body.rename(self.new_body_name.clone());
@@ -208,117 +235,127 @@ impl App {
 
                     Pages::ShowingHoleFeatureOptions => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
 
-                        match key.code {
-                            keybinds::CREATE_CIRCULAR_HOLE_FEATURE => {
-                                self.start_adding_feature(Features::CircularHoleFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_CAPSULAR_HOLE_FEATURE => {
-                                self.start_adding_feature(Features::CapsularHoleFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_RECTANGULAR_HOLE_FEATURE => {
-                                self.start_adding_feature(Features::RectangularHoleFeature);
-                                continue;
-                            }
-                            _ => {}
+                        // adds a circular hole
+                        else if key.code == Instruction::add_circular_hole_instruction().keybind {
+                            self.start_adding_feature(Features::CircularHoleFeature);
+                            continue;
+                        }
+
+                        // adds a capsule hole
+                        else if key.code == Instruction::add_capsular_hole_instruction().keybind {
+                            self.start_adding_feature(Features::CapsularHoleFeature);
+                            continue;
+                        }
+
+                        // adds a rectangular hole
+                        else if key.code == Instruction::add_rectangular_hole_instruction().keybind {
+                            self.start_adding_feature(Features::RectangularHoleFeature);
+                            continue;
                         }
                     }
 
                     Pages::ShowingCornerFeatureOptions => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
 
-                        match key.code {
-                            keybinds::CREATE_FILLET_FEATURE => {
-                                self.start_adding_feature(Features::FilletFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_CHAMFER_FEATURE => {
-                                self.start_adding_feature(Features::ChamferFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_SLOPE_FEATURE => {
-                                self.start_adding_feature(Features::SlopeFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_CLIFF_FEATURE => {
-                                self.start_adding_feature(Features::CliffFeature);
-                                continue;
-                            }
-                            _ => {}
+                        // adds a fillet
+                        else if key.code == Instruction::add_fillet_instruction().keybind {
+                            self.start_adding_feature(Features::FilletFeature);
+                            continue;
+                        }
+
+                        // adds a chamfer
+                        else if key.code == Instruction::add_chamfer_instruction().keybind {
+                            self.start_adding_feature(Features::ChamferFeature);
+                            continue;
+                        }
+
+                        // adds a slope
+                        else if key.code == Instruction::add_slope_instruction().keybind {
+                            self.start_adding_feature(Features::SlopeFeature);
+                            continue;
+                        }
+
+                        // adds a cliff
+                        else if key.code == Instruction::add_cliff_instruction().keybind {
+                            self.start_adding_feature(Features::CliffFeature);
+                            continue;
                         }
                     }
 
                     Pages::ShowingCutoutFeatureOptions => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
 
-                        match key.code {
-                            keybinds::CREATE_NOTCH_FEATURE => {
-                                self.start_adding_feature(Features::NotchFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_SAWTOOTH_FEATURE => {
-                                self.start_adding_feature(Features::SawtoothFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_CLAW_FEATURE => {
-                                self.start_adding_feature(Features::ClawFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_COMPOSITE_SLOPE_FEATURE => {
-                                self.start_adding_feature(Features::CompositeSlopeFeature);
-                                continue;
-                            }
-                            _ => {}
+                        // adds a notch
+                        else if key.code == Instruction::add_notch_instruction().keybind {
+                            self.start_adding_feature(Features::NotchFeature);
+                            continue;
+                        }
+
+                        // adds a sawtooth
+                        else if key.code == Instruction::add_sawtooth_instruction().keybind {
+                            self.start_adding_feature(Features::SawtoothFeature);
+                            continue;
+                        }
+
+                        // adds a claw
+                        else if key.code == Instruction::add_claw_instruction().keybind {
+                            self.start_adding_feature(Features::ClawFeature);
+                            continue;
+                        }
+
+                        // adds a composite slope
+                        else if key.code == Instruction::add_composite_slope_instruction().keybind {
+                            self.start_adding_feature(Features::CompositeSlopeFeature);
+                            continue;
                         }
                     }
 
                     Pages::ShowingCircularFeatureOptions => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
 
-                        match key.code {
-                            keybinds::CREATE_ARC_FEATURE => {
-                                self.start_adding_feature(Features::ArcFeature);
-                                continue;
-                            }
-                            keybinds::CREATE_ELLIPSE_FEATURE => {
-                                self.start_adding_feature(Features::EllipseFeature);
-                                continue;
-                            }
-                            _ => {}
+                        // adds an arc
+                        else if key.code == Instruction::add_arc_instruction().keybind {
+                            self.start_adding_feature(Features::ArcFeature);
+                            continue;
+                        }
+
+                        // adds an ellipse
+                        else if key.code == Instruction::add_ellipse_instruction().keybind {
+                            self.start_adding_feature(Features::EllipseFeature);
+                            continue;
                         }
                     }
 
                     Pages::AddingFeature => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
 
                         // updates the current value input and finishes the current step if the confirmation key is pressed
                         if let Some(path) = &mut self.current_feature_addition_path {
-                            let new_value_input = term_tools::keypad(&path.current_step_value(), key);
+                            let new_value_input = term_tools::numpad(&path.current_step_value_input(), key);
                             path.update_current_step_value_input(new_value_input);
 
-                            if key.code == keybinds::CONFIRM {
+                            if key.code == Instruction::confirm_instruction().keybind {
                                 let result = path.finish_current_step();
                                 if let Some(feature) = result {
                                     self.body.add(feature);
@@ -339,13 +376,19 @@ impl App {
 
                     Pages::RemovingFeature => {
                         // cancels
-                        if key.code == keybinds::CANCEL {
+                        if key.code == Instruction::cancel_instruction().keybind {
                             self.current_page = Pages::BodyView;
                             continue;
                         }
                     }
 
                     Pages::FinishingBody => {
+                        // cancels
+                        if key.code == Instruction::cancel_instruction().keybind {
+                            self.current_page = Pages::BodyView;
+                            continue;
+                        }
+
                         self.new_body_name = "".to_string();
                         self.new_body_width = "".to_string();
                         self.new_body_height = "".to_string();
@@ -356,139 +399,41 @@ impl App {
                     }
 
                     Pages::Quitting => {
-                        break;
+                        // cancels
+                        if key.code == Instruction::cancel_instruction().keybind {
+                            self.current_page = Pages::BodyView;
+                            continue;
+                        }
+
+                        // quits
+                        if key.code == Instruction::confirm_instruction().keybind {
+                            break;
+                        }
                     }
                 }
             }
         }
         Ok(())
     }
-    
-    // general actions
-    pub fn try_quit(&mut self, input: KeyEvent) {
-        if input.code == keybinds::QUIT {
-            self.current_page = Pages::Quitting;
-        }
-    }
-    
+
     pub fn start_adding_feature(&mut self, feature: Features) {
         self.current_feature_addition_path = Some(feature.path());
         self.current_page = Pages::AddingFeature;
     }
-
-    // actions for Adding Body
-
-    pub fn cancel_adding_body(&mut self) {
-        self.new_body_width = "".to_string();
-        self.new_body_height = "".to_string();
-    }
-
-    pub fn finish_adding_body(&mut self) {
-        self.body.set_width(self.new_body_width.parse::<f64>().unwrap_or(0.0));
-        self.body.set_height(self.new_body_height.parse::<f64>().unwrap_or(0.0));
-        self.current_page = Pages::BodyView;
-    }
-
-    // actions for Renaming Body
-    pub fn rename_body(&mut self) {
-        self.body.rename(self.new_body_name.clone());
-        self.new_body_name = "".to_string();
-        self.current_page = Pages::BodyView;
-    }
-    
-    // actions for Body View
-    pub fn show_hole_feature_options(&mut self) { self.current_page = Pages::ShowingHoleFeatureOptions; }
-    
-    pub fn show_corner_feature_options(&mut self) { self.current_page = Pages::ShowingCornerFeatureOptions; }
-    
-    pub fn show_cutout_feature_options(&mut self) { self.current_page = Pages::ShowingCutoutFeatureOptions; }
-
-    pub fn start_renaming_body(&mut self) { self.current_page = Pages::RenamingBody; }
-
-    pub fn start_removing_feature(&mut self) { self.current_page = Pages::RemovingFeature; }
-    
-    pub fn start_finishing_body(&mut self) { self.current_page = Pages::FinishingBody; }
-    
-    pub fn reset_body(&mut self) {
-        self.body = Body::new();
-        self.current_page = Pages::BodyView;
-    }
-    
-    // actions for Adding Feature
-    pub fn cancel_adding_feature(&mut self) { self.current_page = Pages::BodyView; }
-    
-    pub fn update_current_field_value(&mut self, value: &str) {
-        if let Some(path) = &mut self.current_feature_addition_path {
-            path.update_current_step_value_input(value.to_string());
-        }
-    }
-    
-    pub fn finish_step(&mut self) {
-        if let Some(path) = &mut self.current_feature_addition_path {
-            path.finish_current_step();
-        }
-    }
-    
-    // actions for Finishing Body
-    pub fn finish_body(&mut self) {
-        self.new_body_name = "".to_string();
-        self.new_body_width = "".to_string();
-        self.new_body_height = "".to_string();
-        self.is_width_set = false;
-        self.is_height_set = false;
-        self.current_page = Pages::AddingBody;
-    }
 }
 
-pub mod keybinds {
-    use ratatui::crossterm::event::KeyCode;
 
-    // general
-    pub const CANCEL: KeyCode = KeyCode::Char('x');
-    pub const QUIT: KeyCode = KeyCode::Char('q');
-    pub const CONFIRM: KeyCode = KeyCode::Enter;
-    pub const BACKSPACE: KeyCode = KeyCode::Backspace;
-    // body view
-    pub const START_RENAMING_BODY: KeyCode = KeyCode::Char('n');
-    pub const START_REMOVING_FEATURE: KeyCode = KeyCode::Char('r');
-    pub const START_FINISHING_BODY: KeyCode = KeyCode::Char('f');
-    // feature selection
-    //      holes
-    pub const SHOW_HOLE_FEATURES: KeyCode = KeyCode::Char('0');
-    pub const CREATE_CIRCULAR_HOLE_FEATURE: KeyCode = KeyCode::Char('1');
-    pub const CREATE_CAPSULAR_HOLE_FEATURE: KeyCode = KeyCode::Char('2');
-    pub const CREATE_RECTANGULAR_HOLE_FEATURE: KeyCode = KeyCode::Char('3');
-    //      corners
-    pub const SHOW_CORNER_FEATURES: KeyCode = KeyCode::Char('1');
-    pub const CREATE_FILLET_FEATURE: KeyCode = KeyCode::Char('1');
-    pub const CREATE_CHAMFER_FEATURE: KeyCode = KeyCode::Char('2');
-    pub const CREATE_SLOPE_FEATURE: KeyCode = KeyCode::Char('4');
-    pub const CREATE_CLIFF_FEATURE: KeyCode = KeyCode::Char('5');
-    //      cutouts
-    pub const SHOW_CUTOUT_FEATURES: KeyCode = KeyCode::Char('2');
-    pub const CREATE_NOTCH_FEATURE: KeyCode = KeyCode::Char('1');
-    pub const CREATE_SAWTOOTH_FEATURE: KeyCode = KeyCode::Char('2');
-    pub const CREATE_CLAW_FEATURE: KeyCode = KeyCode::Char('3');
-    pub const CREATE_COMPOSITE_SLOPE_FEATURE: KeyCode = KeyCode::Char('4');
-    //      circular features
-    pub const SHOW_CIRCULAR_FEATURES: KeyCode = KeyCode::Char('3');
-    pub const CREATE_ARC_FEATURE: KeyCode = KeyCode::Char('1');
-    pub const CREATE_ELLIPSE_FEATURE: KeyCode = KeyCode::Char('2');
-    //      other features
-    pub const CREATE_OTHER_FEATURE: KeyCode = KeyCode::Char('4');
-}
 
 pub mod term_tools {
     use ratatui::crossterm::event;
-    use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
-    use crate::app::keybinds;
+    use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
     pub fn numpad(field: &str, input: KeyEvent) -> String {
         if input.kind == event::KeyEventKind::Release { return field.to_string(); }
 
         let mut field = field.to_string();
         match input.code {
-            keybinds::BACKSPACE => {
+            KeyCode::Backspace => {
                 if field.is_empty() { return field; }
                 field.remove(field.len() - 1);
             }
@@ -510,7 +455,7 @@ pub mod term_tools {
 
         let mut field = field.to_string();
         match input.code {
-            keybinds::BACKSPACE => {
+            KeyCode::Backspace => {
                 if field.is_empty() { return field; }
                 field.remove(field.len() - 1);
             }
