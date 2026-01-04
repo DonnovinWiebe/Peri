@@ -407,7 +407,7 @@ impl Body {
 
         perimeter
     }
-    
+
     /// Summarizes the body
     pub fn summarize(&self) -> Vec<Line> {
         let mut summary = Vec::new();
@@ -419,13 +419,13 @@ impl Body {
         summary.push(Line::from(width));
         summary.push(Line::from(height));
         summary.push(Line::from(perimeter));
-        
+
         for feature in &self.features {
             let blank = "".to_string();
             summary.push(Line::from(blank));
             summary.extend(feature.summarize());
         }
-        
+
         summary
     }
 }
@@ -966,7 +966,7 @@ impl Feature for CompositeSlope {
 
     /// Gets the perimeter modification of the valley.
     fn value(&self) -> f64 {
-        formulas::claw_modification(self.height, self.angle) * self.count as f64
+        formulas::composite_slope_modification(self.height, self.angle, self.slope_type) * self.count as f64
     }
 }
 
