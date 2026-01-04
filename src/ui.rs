@@ -33,25 +33,28 @@ pub mod standard {
 
 
 pub fn ui(frame: &mut Frame, app: &mut App) {
-    // The main sections of the screen.
-    let leaflets = Layout::new(Direction::Vertical, [
-        Constraint::Length(4), // header
-        Constraint::Min(1), // body
-        Constraint::Max(5), // footer
-    ]).split(frame.area());
-
     // header
     let header_block = Block::new().borders(Borders::ALL);
     let header = Paragraph::new(vec![
         Line::raw("PERI"),
         Line::raw(app.current_page_name()),
     ]).block(header_block);
-    frame.render_widget(header, leaflets[0]);
 
     // footer
     let footer_block = Block::new().borders(Borders::ALL);
-    let instructions = Line::from(get_instructions_for(&app.current_page));
-    let footer = Paragraph::new(instructions).wrap(Wrap { trim: true }).block(footer_block);
+    let instructions = get_instructions_for(&app.current_page);
+    let instructions_height = instructions.len() as u16 + 2;
+    let footer = Paragraph::new(instructions).block(footer_block);
+
+    // The sections of the screen.
+    let leaflets = Layout::new(Direction::Vertical, [
+        Constraint::Length(4), // header
+        Constraint::Fill(1), // body
+        Constraint::Length(instructions_height), // footer
+    ]).split(frame.area());
+
+    // rendering the header and footer
+    frame.render_widget(header, leaflets[0]);
     frame.render_widget(footer, leaflets[2]);
 
     // body
@@ -143,10 +146,39 @@ pub struct Instruction {
 impl Instruction {
     pub fn new(key: String, label: String, keybind: KeyCode) -> Instruction { Instruction {key, label, keybind } }
 
-    pub fn printed(&mut self) -> String {
+    fn printed(&mut self) -> String {
         let mut print = "".to_string();
-        print += &format!("[ {} ] : {}", &self.key, &self.label);
+        print += &format!("[{}] {}", &self.key, &self.label);
         print
+    }
+
+    pub fn in_groups(instructions: Vec<Instruction>, group_limit: usize) -> Vec<Line<'static>> {
+        // the lines of instructions to be returned
+        let mut lines = Vec::new();
+
+        // the current line of instructions being assembled
+        let mut current_group: String = "".to_string();
+        let mut amount_in_group: usize = 0;
+
+        // adds the current line to the list of lines and creates a new blank line in its place if it reaches the group limit
+        for mut instruction in instructions {
+            if amount_in_group >= group_limit {
+                lines.push(Line::from(current_group));
+                current_group = "".to_string();
+                amount_in_group = 0;
+            }
+
+            // adds the current instruction to the current line
+            amount_in_group += 1;
+            if current_group != "" { current_group += " | "; }
+            current_group += instruction.printed().as_str();
+        }
+
+        // adds the last line to the list of lines if it isn't empty
+        if current_group != "" { lines.push(Line::from(current_group)); }
+
+        // returns the list of lines
+        lines
     }
 
     // instructions
@@ -187,118 +219,106 @@ impl Instruction {
 
 
 
-pub fn get_instructions_for(page: &Pages) -> Vec<Span> {
-    let mut instructions = vec![];
-    let space = Span::raw("   ");
-
-    match page {
+pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
+    return match page {
         Pages::Launching => {
-            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::quit_instruction(),
+            ], 3)
         }
 
         Pages::AddingBody => {
-            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::cancel_instruction(),
+                Instruction::quit_instruction(),
+            ], 3)
         }
 
         Pages::BodyView => {
-            instructions.push(Span::raw(Instruction::add_hole_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_corner_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_cutout_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_circular_feature_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_other_feature_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::rename_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::remove_feature_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::finish_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::reset_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::add_hole_instruction(),
+                Instruction::add_corner_instruction(),
+                Instruction::add_cutout_instruction(),
+                Instruction::add_circular_feature_instruction(),
+                Instruction::add_other_feature_instruction(),
+                Instruction::rename_instruction(),
+                Instruction::remove_feature_instruction(),
+                Instruction::finish_instruction(),
+                Instruction::reset_instruction(),
+                Instruction::quit_instruction(),
+            ], 3)
         }
 
         Pages::RenamingBody => {
-            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
-
         Pages::ShowingHoleFeatureOptions => {
-            instructions.push(Span::raw(Instruction::add_circular_hole_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_capsular_hole_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_rectangular_hole_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::add_circular_hole_instruction(),
+                Instruction::add_capsular_hole_instruction(),
+                Instruction::add_rectangular_hole_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::ShowingCornerFeatureOptions => {
-            instructions.push(Span::raw(Instruction::add_fillet_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_chamfer_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_slope_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_cliff_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::add_fillet_instruction(),
+                Instruction::add_chamfer_instruction(),
+                Instruction::add_slope_instruction(),
+                Instruction::add_cliff_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::ShowingCutoutFeatureOptions => {
-            instructions.push(Span::raw(Instruction::add_notch_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_sawtooth_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_claw_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_composite_slope_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_arc_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_ellipse_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::add_notch_instruction(),
+                Instruction::add_sawtooth_instruction(),
+                Instruction::add_claw_instruction(),
+                Instruction::add_composite_slope_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::ShowingCircularFeatureOptions => {
-            instructions.push(Span::raw(Instruction::add_arc_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::add_ellipse_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::add_arc_instruction(),
+                Instruction::add_ellipse_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::AddingFeature => {
-            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::RemovingFeature => {
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::FinishingBody => {
-            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
 
         Pages::Quitting => {
-            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(space.clone());
-            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::cancel_instruction(),
+            ], 3)
         }
     }
-
-    instructions
 }
