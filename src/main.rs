@@ -1,13 +1,11 @@
-use std::error::Error;
 use std::io::Result;
 use std::io;
 use ratatui::crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen};
-use ratatui::prelude::{Backend, CrosstermBackend};
+use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 use crate::app::App;
-use crate::ui::ui;
 
 mod shapes;
 mod app;
