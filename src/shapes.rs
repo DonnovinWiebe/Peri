@@ -1,8 +1,7 @@
 use std::any::Any;
 use std::cmp::PartialEq;
-use std::f64::consts::PI;
 use std::net::ToSocketAddrs;
-use crate::shapes::Features::SawtoothFeature;
+use ratatui::text::Line;
 
 /// The list of possible features.
 #[derive(Clone)]
@@ -160,21 +159,26 @@ pub trait Feature {
     /// Returns how many of the feature there are.
     fn count(&self) -> usize;
 
+    /// Returns a collection of summary information
+    fn summarize(&self) -> Vec<Line> {
+        let mut summary = Vec::new();
+        summary.push(Line::from(self.summarize_feature()));
+        summary.extend(self.summarize_dimensions());
+        summary.push(Line::from(self.summarize_modification()));
+        summary
+    }
+
     /// Returns a standardized summary of the feature.
-    fn summarize_feature(&self) -> String {
-        let mut sum = "".to_string();
-        sum += &format!("{}x {}", self.count(), Self::shape(&self).name());
-        sum
+    fn summarize_feature(&self) -> Line {
+        Line::from(format!("{}x {}", self.count(), self.shape().name()))
     }
 
     /// Returns a standardized dimension list of the feature.
-    fn summarize_dimensions(&self) -> String;
+    fn summarize_dimensions(&self) -> Vec<Line>;
 
     /// Returns a standardized modification summary of the feature.
-    fn summarize_modification(&self) -> String {
-        let mut sum = "".to_string();
-        sum += &format!("modification: {} ", &format!("{:.3}", self.value()));
-        sum
+    fn summarize_modification(&self) -> Line {
+        Line::from(format!("modification: {}", &format!("{:.3}", self.value())))
     }
 
     /// Returns the perimeter modification of the feature.
@@ -200,6 +204,9 @@ impl FeatureAdditionPath {
 
     /// Returns the current step's field.
     pub fn current_step_value(&self) -> String { self.steps[self.current_step].field.clone() }
+
+    /// Returns the current step's field.
+    pub fn current_step_value_input(&self) -> String { self.steps[self.current_step].value_input.clone() }
 
     /// Updates the current step's value input.
     pub fn update_current_step_value_input(&mut self, new_value_input: String) { self.steps[self.current_step].update_value_input(new_value_input); }
@@ -374,6 +381,14 @@ impl Body {
     /// Sets the overall height of the body.
     pub fn set_height(&mut self, height: f64) { self.height = height; }
 
+    /// Adds a feature.
+    pub fn add(&mut self, feature: Box<dyn Feature>) { self.features.push(feature); }
+
+    /// Removes a feature
+    pub fn remove(&mut self, index: usize) {
+        if self.features.len() >= index { self.features.remove(index); }
+    }
+
     /// Gets the full perimeter of the body with all of its features.
     pub fn perimeter(&self) -> f64 {
         let mut perimeter = (self.width + self.height) * 2.0;
@@ -393,13 +408,26 @@ impl Body {
 
         perimeter
     }
-
-    /// Adds a feature.
-    pub fn add(&mut self, feature: Box<dyn Feature>) { self.features.push(feature); }
-
-    /// Removes a feature
-    pub fn remove(&mut self, index: usize) {
-        if self.features.len() >= index { self.features.remove(index); }
+    
+    /// Summarizes the body
+    pub fn summarize(&self) -> Vec<Line> {
+        let mut summary = Vec::new();
+        let name = format!("name: {}", &self.name);
+        let width = format!("width: {}, ", &format!("{:.3}", self.width));
+        let height = format!("height: {}", &format!("{:.3}", self.height));
+        let perimeter = format!("perimeter: {}", &format!("{:.3}", self.perimeter()));
+        summary.push(Line::from(name));
+        summary.push(Line::from(width));
+        summary.push(Line::from(height));
+        summary.push(Line::from(perimeter));
+        
+        for feature in &self.features {
+            let blank = "".to_string();
+            summary.push(Line::from(blank));
+            summary.extend(feature.summarize());
+        }
+        
+        summary
     }
 }
 
@@ -429,9 +457,10 @@ impl Feature for CircularHole {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("diameter: {}", &format!("{:.3}", self.diameter));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let diameter = format!("diameter: {}", format!("{:.3}", self.diameter));
+        dims.push(Line::from(diameter));
         dims
     }
 
@@ -469,10 +498,12 @@ impl Feature for CapsularHole {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("diameter: {}, ", &format!("{:.3}", self.diameter));
-        dims += &format!("width: {}", &format!("{:.3}", self.width));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let diameter = format!("diameter: {}, ", &format!("{:.3}", self.diameter));
+        let width = format!("width: {}", &format!("{:.3}", self.width));
+        dims.push(Line::from(diameter));
+        dims.push(Line::from(width));
         dims
     }
 
@@ -510,10 +541,12 @@ impl Feature for RectangularHole {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("width: {}, ", &format!("{:.3}", self.width));
-        dims += &format!("height: {}", &format!("{:.3}", self.height));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let width = format!("width: {}, ", &format!("{:.3}", self.width));
+        let height = format!("height: {}", &format!("{:.3}", self.height));
+        dims.push(Line::from(width));
+        dims.push(Line::from(height));
         dims
     }
 
@@ -549,9 +582,10 @@ impl Feature for Fillet {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("radius: {}", &format!("{:.3}", self.radius));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let radius = format!("radius: {}", &format!("{:.3}", self.radius));
+        dims.push(Line::from(radius));
         dims
     }
 
@@ -587,9 +621,10 @@ impl Feature for Chamfer {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("size: {}", &format!("{:.3}", self.size));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let size = format!("size: {}", &format!("{:.3}", self.size));
+        dims.push(Line::from(size));
         dims
     }
 
@@ -627,10 +662,12 @@ impl Feature for Slope {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
-        dims += &format!("angle: {}", &format!("{:.3}", self.angle));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let height = format!("height: {}, ", &format!("{:.3}", self.height));
+        let angle = format!("angle: {}", &format!("{:.3}", self.angle));
+        dims.push(Line::from(height));
+        dims.push(Line::from(angle));
         dims
     }
 
@@ -668,10 +705,12 @@ impl Feature for Cliff {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
-        dims += &format!("angle: {}", &format!("{:.3}", self.angle));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let height = format!("height: {}, ", &format!("{:.3}", self.height));
+        let angle = format!("angle: {}", &format!("{:.3}", self.angle));
+        dims.push(Line::from(height));
+        dims.push(Line::from(angle));
         dims
     }
 
@@ -707,9 +746,10 @@ impl Feature for Notch {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("depth: {}", &format!("{:.3}", self.depth));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let depth = format!("depth: {}", &format!("{:.3}", self.depth));
+        dims.push(Line::from(depth));
         dims
     }
 
@@ -747,10 +787,12 @@ impl Feature for Sawtooth {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
-        dims += &format!("angle: {}", &format!("{:.3}", self.angle));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let height = format!("height: {}, ", &format!("{:.3}", self.height));
+        let angle = format!("angle: {}", &format!("{:.3}", self.angle));
+        dims.push(Line::from(height));
+        dims.push(Line::from(angle));
         dims
     }
 
@@ -788,10 +830,12 @@ impl Feature for Claw {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
-        dims += &format!("angle: {}", &format!("{:.3}", self.angle));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let height = format!("height: {}, ", &format!("{:.3}", self.height));
+        let angle = format!("angle: {}", &format!("{:.3}", self.angle));
+        dims.push(Line::from(height));
+        dims.push(Line::from(angle));
         dims
     }
 
@@ -906,13 +950,18 @@ impl Feature for CompositeSlope {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("height: {}, ", &format!("{:.3}", self.height));
-        dims += &format!("angle: {}, ", &format!("{:.3}", self.angle));
-        dims += &format!("slope_type: {}, ", match self.slope_type { SlopeType::Convex => "convex", SlopeType::Concave => "concave" });
-        dims += &format!("slope_direction: {}, ", match self.slope_direction { SlopeDirection::Up => "up", SlopeDirection::Down => "down" });
-        dims += &format!("slope_id: {}", self.slope_id);
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let height = format!("height: {}, ", &format!("{:.3}", self.height));
+        let angle = format!("angle: {}, ", &format!("{:.3}", self.angle));
+        let slope_type = format!("slope_type: {}, ", match self.slope_type { SlopeType::Convex => "convex", SlopeType::Concave => "concave" });
+        let slope_direction = format!("slope_direction: {}, ", match self.slope_direction { SlopeDirection::Up => "up", SlopeDirection::Down => "down" });
+        let slope_id = format!("slope_id: {}", self.slope_id);
+        dims.push(Line::from(height));
+        dims.push(Line::from(angle));
+        dims.push(Line::from(slope_type));
+        dims.push(Line::from(slope_direction));
+        dims.push(Line::from(slope_id));
         dims
     }
 
@@ -950,10 +999,12 @@ impl Feature for Arc {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("radius: {}, ", &format!("{:.3}", self.radius));
-        dims += &format!("height: {}", &format!("{:.3}", self.height));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let radius = format!("radius: {}, ", &format!("{:.3}", self.radius));
+        let height = format!("height: {}", &format!("{:.3}", self.height));
+        dims.push(Line::from(radius));
+        dims.push(Line::from(height));
         dims
     }
 
@@ -991,10 +1042,12 @@ impl Feature for Ellipse {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String {
-        let mut dims = "".to_string();
-        dims += &format!("width: {}, ", &format!("{:.3}", self.width));
-        dims += &format!("height: {}", &format!("{:.3}", self.height));
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let width = format!("width: {}, ", &format!("{:.3}", self.width));
+        let height = format!("height: {}", &format!("{:.3}", self.height));
+        dims.push(Line::from(width));
+        dims.push(Line::from(height));
         dims
     }
 
@@ -1030,7 +1083,12 @@ impl Feature for OtherFeature {
     fn count(&self) -> usize { self.count }
 
     /// A basic dimension overview.
-    fn summarize_dimensions(&self) -> String { "no dimensions".to_string() }
+    fn summarize_dimensions(&self) -> Vec<Line> {
+        let mut dims = Vec::new();
+        let count = format!("count: {}", self.count);
+        dims.push(Line::from(count));
+        dims
+    }
 
     /// Gets the perimeter modification of the catch-all feature.
     fn value(&self) -> f64 {

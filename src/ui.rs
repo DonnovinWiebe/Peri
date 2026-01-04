@@ -1,5 +1,6 @@
+use ratatui::crossterm::event::KeyCode;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::prelude::*;
 use ratatui::widgets::*;
 use crate::app::{App, Pages};
@@ -49,7 +50,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
     // footer
     let footer_block = Block::new().borders(Borders::ALL);
-    let instructions = get_instructions_for(&app.current_page);
+    let instructions = Line::from(get_instructions_for(&app.current_page));
     let footer = Paragraph::new(instructions).wrap(Wrap { trim: true }).block(footer_block);
     frame.render_widget(footer, leaflets[2]);
 
@@ -71,13 +72,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         }
 
         Pages::BodyView => {
-            let body = Paragraph::new(vec![
-                Line::raw(&app.body.name),
-                Line::raw(format!("Width : {}", app.body.width)),
-                Line::raw(format!("Height: {}", app.body.height)),
-                Line::raw(format!("Perimeter : {}", app.body.perimeter())),
-            ]);
-
+            let body = Paragraph::new(app.body.summarize());
             frame.render_widget(body, leaflets[1]);
         }
 
@@ -109,7 +104,10 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         Pages::AddingFeature => {
             let body;
             if let Some(path) = &app.current_feature_addition_path {
-                body = Paragraph::new(format!("Adding {}", path.feature.name()));
+                body = Paragraph::new(vec![
+                    Line::from(format!("Adding {}", path.feature.name())),
+                    Line::from(format!("{}: {}", path.current_step_value(), path.current_step_value_input())),
+                ]);
             }
             else {
                 body = Paragraph::new("Cannot display feature type");
@@ -137,14 +135,15 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
 
 
 
-struct Instruction {
+pub struct Instruction {
     key: String,
     label: String,
+    pub keybind: KeyCode
 }
 impl Instruction {
-    pub fn new(key: String, label: String) -> Instruction { Instruction {key, label } }
+    pub fn new(key: String, label: String, keybind: KeyCode) -> Instruction { Instruction {key, label, keybind } }
 
-    fn printed(&mut self) -> String {
+    pub fn printed(&mut self) -> String {
         let mut print = "".to_string();
         print += &format!("[ {} ] : {}", &self.key, &self.label);
         print
@@ -152,119 +151,152 @@ impl Instruction {
 
     // instructions
     //      navigation
-    fn confirm_instruction() -> Instruction { Instruction::new("ENTER".to_string(), "confirm".to_string()) }
-    fn cancel_instruction() -> Instruction { Instruction::new("X".to_string(), "cancel".to_string()) }
-    fn quit_instruction() -> Instruction { Instruction::new("Q".to_string(), "quit".to_string()) }
+    pub fn confirm_instruction() -> Instruction { Instruction::new("ENTER".to_string(), "confirm".to_string(), KeyCode::Enter) }
+    pub fn cancel_instruction() -> Instruction { Instruction::new("X".to_string(), "cancel".to_string(), KeyCode::Char('x')) }
+    pub fn quit_instruction() -> Instruction { Instruction::new("Q".to_string(), "quit".to_string(), KeyCode::Char('q')) }
     //      body/feature management
-    fn rename_instruction() -> Instruction { Instruction::new("N".to_string(), "rename body".to_string()) }
-    fn finish_instruction() -> Instruction { Instruction::new("F".to_string(), "finish".to_string()) }
-    fn remove_feature_instruction() -> Instruction { Instruction::new("R".to_string(), "remove feature".to_string()) }
+    pub fn rename_instruction() -> Instruction { Instruction::new("N".to_string(), "rename body".to_string(), KeyCode::Char('n')) }
+    pub fn finish_instruction() -> Instruction { Instruction::new("F".to_string(), "finish".to_string(), KeyCode::Char('f')) }
+    pub fn reset_instruction() -> Instruction { Instruction::new("ESC".to_string(), "reset".to_string(), KeyCode::Esc) }
+    pub fn remove_feature_instruction() -> Instruction { Instruction::new("R".to_string(), "remove feature".to_string(), KeyCode::Char('r')) }
     //      holes
-    fn add_hole_instruction() -> Instruction { Instruction::new("0".to_string(), "add hole".to_string()) }
-    fn add_circular_hole_instruction() -> Instruction { Instruction::new("1".to_string(), "add circular hole".to_string()) }
-    fn add_capsular_hole_instruction() -> Instruction { Instruction::new("2".to_string(), "add capsular hole".to_string()) }
-    fn add_rectangular_hole_instruction() -> Instruction { Instruction::new("3".to_string(), "add rectangular hole".to_string()) }
+    pub fn add_hole_instruction() -> Instruction { Instruction::new("0".to_string(), "add hole".to_string(), KeyCode::Char('0')) }
+    pub fn add_circular_hole_instruction() -> Instruction { Instruction::new("1".to_string(), "add circular hole".to_string(), KeyCode::Char('1')) }
+    pub fn add_capsular_hole_instruction() -> Instruction { Instruction::new("2".to_string(), "add capsular hole".to_string(), KeyCode::Char('2')) }
+    pub fn add_rectangular_hole_instruction() -> Instruction { Instruction::new("3".to_string(), "add rectangular hole".to_string(), KeyCode::Char('3')) }
     //      corners
-    fn add_corner_instruction() -> Instruction { Instruction::new("1".to_string(), "add corner".to_string()) }
-    fn add_fillet_instruction() -> Instruction { Instruction::new("1".to_string(), "add fillet".to_string()) }
-    fn add_chamfer_instruction() -> Instruction { Instruction::new("2".to_string(), "add chamfer".to_string()) }
-    fn add_slope_instruction() -> Instruction { Instruction::new("4".to_string(), "add slope".to_string()) }
-    fn add_cliff_instruction() -> Instruction { Instruction::new("5".to_string(), "add cliff".to_string()) }
+    pub fn add_corner_instruction() -> Instruction { Instruction::new("1".to_string(), "add corner".to_string(), KeyCode::Char('1')) }
+    pub fn add_fillet_instruction() -> Instruction { Instruction::new("1".to_string(), "add fillet".to_string(), KeyCode::Char('1')) }
+    pub fn add_chamfer_instruction() -> Instruction { Instruction::new("2".to_string(), "add chamfer".to_string(), KeyCode::Char('2')) }
+    pub fn add_slope_instruction() -> Instruction { Instruction::new("4".to_string(), "add slope".to_string(), KeyCode::Char('4')) }
+    pub fn add_cliff_instruction() -> Instruction { Instruction::new("5".to_string(), "add cliff".to_string(), KeyCode::Char('5')) }
     //      cutout
-    fn add_cutout_instruction() -> Instruction { Instruction::new("2".to_string(), "add cutout".to_string()) }
-    fn add_notch_instruction() -> Instruction { Instruction::new("1".to_string(), "add notch".to_string()) }
-    fn add_sawtooth_instruction() -> Instruction { Instruction::new("2".to_string(), "add sawtooth".to_string()) }
-    fn add_claw_instruction() -> Instruction { Instruction::new("3".to_string(), "add claw".to_string()) }
-    fn add_composite_slope_instruction() -> Instruction { Instruction::new("4".to_string(), "add composite slope".to_string()) }
+    pub fn add_cutout_instruction() -> Instruction { Instruction::new("2".to_string(), "add cutout".to_string(), KeyCode::Char('2')) }
+    pub fn add_notch_instruction() -> Instruction { Instruction::new("1".to_string(), "add notch".to_string(), KeyCode::Char('1')) }
+    pub fn add_sawtooth_instruction() -> Instruction { Instruction::new("2".to_string(), "add sawtooth".to_string(), KeyCode::Char('2')) }
+    pub fn add_claw_instruction() -> Instruction { Instruction::new("3".to_string(), "add claw".to_string(), KeyCode::Char('3')) }
+    pub fn add_composite_slope_instruction() -> Instruction { Instruction::new("4".to_string(), "add composite slope".to_string(), KeyCode::Char('4')) }
     //      circular
-    fn add_circular_feature_instruction() -> Instruction { Instruction::new("3".to_string(), "add circular feature".to_string()) }
-    fn add_arc_instruction() -> Instruction { Instruction::new("1".to_string(), "add arc".to_string()) }
-    fn add_ellipse_instruction() -> Instruction { Instruction::new("2".to_string(), "add ellipse".to_string()) }
+    pub fn add_circular_feature_instruction() -> Instruction { Instruction::new("3".to_string(), "add circular feature".to_string(), KeyCode::Char('3')) }
+    pub fn add_arc_instruction() -> Instruction { Instruction::new("1".to_string(), "add arc".to_string(), KeyCode::Char('1')) }
+    pub fn add_ellipse_instruction() -> Instruction { Instruction::new("2".to_string(), "add ellipse".to_string(), KeyCode::Char('2')) }
 
     //      other
-    fn add_other_feature_instruction() -> Instruction { Instruction::new("4".to_string(), "add other feature".to_string()) }
+    pub fn add_other_feature_instruction() -> Instruction { Instruction::new("4".to_string(), "add other feature".to_string(), KeyCode::Char('4')) }
 }
 
 
 
-pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
+pub fn get_instructions_for(page: &Pages) -> Vec<Span> {
     let mut instructions = vec![];
+    let space = Span::raw("   ");
 
     match page {
         Pages::Launching => {
-            instructions.push(Line::raw(Instruction::quit_instruction().printed()));
+            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
         }
 
         Pages::AddingBody => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
-            instructions.push(Line::raw(Instruction::quit_instruction().printed()));
+            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
         }
 
         Pages::BodyView => {
-            instructions.push(Line::raw(Instruction::add_hole_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_corner_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_cutout_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_other_feature_instruction().printed()));
-            instructions.push(Line::raw(Instruction::remove_feature_instruction().printed()));
-            instructions.push(Line::raw(Instruction::finish_instruction().printed()));
-            instructions.push(Line::raw(Instruction::quit_instruction().printed()));
+            instructions.push(Span::raw(Instruction::add_hole_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_corner_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_cutout_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_circular_feature_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_other_feature_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::rename_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::remove_feature_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::finish_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::reset_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::quit_instruction().printed()));
         }
 
         Pages::RenamingBody => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
 
         Pages::ShowingHoleFeatureOptions => {
-            instructions.push(Line::raw(Instruction::add_circular_hole_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_capsular_hole_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_rectangular_hole_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::add_circular_hole_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_capsular_hole_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_rectangular_hole_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::ShowingCornerFeatureOptions => {
-            instructions.push(Line::raw(Instruction::add_fillet_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_chamfer_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_slope_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_cliff_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::add_fillet_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_chamfer_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_slope_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_cliff_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::ShowingCutoutFeatureOptions => {
-            instructions.push(Line::raw(Instruction::add_notch_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_sawtooth_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_claw_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_composite_slope_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_arc_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_ellipse_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::add_notch_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_sawtooth_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_claw_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_composite_slope_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_arc_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_ellipse_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::ShowingCircularFeatureOptions => {
-            instructions.push(Line::raw(Instruction::add_arc_instruction().printed()));
-            instructions.push(Line::raw(Instruction::add_ellipse_instruction().printed()));
+            instructions.push(Span::raw(Instruction::add_arc_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::add_ellipse_instruction().printed()));
         }
 
         Pages::AddingFeature => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::RemovingFeature => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::FinishingBody => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
 
         Pages::Quitting => {
-            instructions.push(Line::raw(Instruction::confirm_instruction().printed()));
-            instructions.push(Line::raw(Instruction::cancel_instruction().printed()));
+            instructions.push(Span::raw(Instruction::confirm_instruction().printed()));
+            instructions.push(space.clone());
+            instructions.push(Span::raw(Instruction::cancel_instruction().printed()));
         }
     }
 
