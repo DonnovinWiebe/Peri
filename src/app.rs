@@ -160,6 +160,7 @@ impl App {
                             self.is_width_set = false;
                             self.is_height_set = false;
                             self.body = Body::new();
+                            self.current_page = Pages::AddingBody;
                             continue;
                         }
 
