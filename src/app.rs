@@ -18,6 +18,7 @@ pub enum Pages {
     ShowingCircularFeatureOptions, // i
     AddingFeature, // i
     RemovingFeature, // i
+    ResettingBody, //i
     FinishingBody, // i
     Quitting, // i
 }
@@ -64,6 +65,7 @@ impl App {
             Pages::ShowingCircularFeatureOptions => { "Circular Feature Options".to_string() }
             Pages::AddingFeature => { "Adding Feature".to_string() }
             Pages::RemovingFeature => { "Removing Feature".to_string() }
+            Pages::ResettingBody => { "Resetting Body".to_string() }
             Pages::FinishingBody => { "Finishing Body".to_string() }
             Pages::Quitting => { "Quitting".to_string() }
         }
@@ -150,20 +152,6 @@ impl App {
                             continue;
                         }
 
-                        // resets
-                        else if key.code == Instruction::reset_instruction().keybind {
-                            self.new_body_name = "".to_string();
-                            self.new_body_width = "".to_string();
-                            self.new_body_height = "".to_string();
-                            self.is_name_set = false;
-                            self.is_width_set = false;
-                            self.is_height_set = false;
-                            self.body = Body::new();
-                            self.current_page = Pages::AddingBody;
-                            continue;
-                        }
-
-
                         // shows hole feature options
                         else if key.code == Instruction::add_hole_instruction().keybind {
                             self.current_page = Pages::ShowingHoleFeatureOptions;
@@ -196,6 +184,7 @@ impl App {
 
                         // renames a body
                         else if key.code == Instruction::rename_instruction().keybind {
+                            self.new_body_name = self.body.name.clone();
                             self.current_page = Pages::RenamingBody;
                             continue;
                         }
@@ -203,6 +192,12 @@ impl App {
                         // removes a feature
                         else if key.code == Instruction::remove_feature_instruction().keybind {
                             self.current_page = Pages::RemovingFeature;
+                            continue;
+                        }
+
+                        // resets the body
+                        else if key.code == Instruction::reset_instruction().keybind {
+                            self.current_page = Pages::ResettingBody;
                             continue;
                         }
 
@@ -214,13 +209,6 @@ impl App {
                     }
 
                     Pages::RenamingBody => {
-                        // cancels/resets
-                        if key.code == Instruction::cancel_instruction().keybind {
-                            self.is_name_set = true;
-                            self.new_body_name = "".to_string();
-                            continue;
-                        }
-
                         // edits the new body name
                         self.new_body_name = term_tools::keypad(&self.new_body_name, key);
 
@@ -382,6 +370,27 @@ impl App {
                         }
                     }
 
+                    Pages::ResettingBody => {
+                        // cancels
+                        if key.code == Instruction::cancel_instruction().keybind {
+                            self.current_page = Pages::BodyView;
+                            continue;
+                        }
+
+                        // resets the body
+                        else if key.code == Instruction::confirm_instruction().keybind {
+                            self.new_body_name = "".to_string();
+                            self.new_body_width = "".to_string();
+                            self.new_body_height = "".to_string();
+                            self.is_name_set = false;
+                            self.is_width_set = false;
+                            self.is_height_set = false;
+                            self.body = Body::new();
+                            self.current_page = Pages::AddingBody;
+                            continue;
+                        }
+                    }
+
                     Pages::FinishingBody => {
                         // cancels
                         if key.code == Instruction::cancel_instruction().keybind {
@@ -389,13 +398,18 @@ impl App {
                             continue;
                         }
 
-                        self.new_body_name = "".to_string();
-                        self.new_body_width = "".to_string();
-                        self.new_body_height = "".to_string();
-                        self.is_width_set = false;
-                        self.is_height_set = false;
-                        self.current_page = Pages::AddingBody;
-                        continue;
+                        // finishes the body
+                        else if key.code == Instruction::confirm_instruction().keybind {
+                            self.new_body_name = "".to_string();
+                            self.new_body_width = "".to_string();
+                            self.new_body_height = "".to_string();
+                            self.is_name_set = false;
+                            self.is_width_set = false;
+                            self.is_height_set = false;
+                            self.body = Body::new();
+                            self.current_page = Pages::AddingBody;
+                            continue;
+                        }
                     }
 
                     Pages::Quitting => {
@@ -406,7 +420,7 @@ impl App {
                         }
 
                         // quits
-                        if key.code == Instruction::confirm_instruction().keybind {
+                        else if key.code == Instruction::confirm_instruction().keybind {
                             break;
                         }
                     }

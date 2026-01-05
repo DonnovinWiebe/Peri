@@ -60,7 +60,7 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     // body
     match app.current_page {
         Pages::Launching => {
-            let body = Paragraph::new("PERI");
+            let body = Paragraph::new("Press any button to continue...");
             frame.render_widget(body, leaflets[1]);
         }
 
@@ -124,13 +124,18 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
             frame.render_widget(body, leaflets[1]);
         }
 
+        Pages::ResettingBody => {
+            let body = Paragraph::new("Reset body?");
+            frame.render_widget(body, leaflets[1]);
+        }
+
         Pages::FinishingBody => {
             let body = Paragraph::new("Complete body?");
             frame.render_widget(body, leaflets[1]);
         }
 
         Pages::Quitting => {
-            let body = Paragraph::new("Quitting...");
+            let body = Paragraph::new("Quit?");
             frame.render_widget(body, leaflets[1]);
         }
     }
@@ -222,9 +227,7 @@ impl Instruction {
 pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
     return match page {
         Pages::Launching => {
-            Instruction::in_groups(vec![
-                Instruction::quit_instruction(),
-            ], 3)
+            Instruction::in_groups(vec![], 3)
         }
 
         Pages::AddingBody => {
@@ -253,7 +256,6 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
         Pages::RenamingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
-                Instruction::cancel_instruction(),
             ], 3)
         }
 
@@ -303,6 +305,13 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
 
         Pages::RemovingFeature => {
             Instruction::in_groups(vec![
+                Instruction::cancel_instruction(),
+            ], 3)
+        }
+
+        Pages::ResettingBody => {
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
             ], 3)
         }
