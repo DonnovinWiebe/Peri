@@ -3,10 +3,14 @@ use std::string::String;
 use ratatui::backend::Backend;
 use ratatui::crossterm::event;
 use ratatui::crossterm::event::Event;
+use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::prelude::Line;
 use ratatui::Terminal;
+use ratatui::widgets::{Block, Borders, Paragraph};
 use crate::shapes::*;
-use crate::ui::{ui, Instruction};
+use crate::ui::{get_instructions_for, ui, Instruction};
 
+#[derive(Copy, Clone)]
 pub enum Pages {
     Launching, // c
     AddingBody, // c
@@ -26,7 +30,7 @@ pub enum Pages {
 
 
 pub struct App {
-    pub body: Body,
+    pub body: Body<>,
     pub current_page: Pages,
     pub is_name_set: bool,
     pub is_width_set: bool,
@@ -34,8 +38,9 @@ pub struct App {
     pub new_body_name: String,
     pub new_body_width: String,
     pub new_body_height: String,
-    
     pub current_feature_addition_path: Option<FeatureAdditionPath>,
+    pub feature_page_index: usize,
+    pub feature_pages: Vec<Vec<String>>,
 }
 
 impl App {
@@ -50,7 +55,34 @@ impl App {
             new_body_width: "".to_string(),
             new_body_height: "".to_string(),
             current_feature_addition_path: None,
+            feature_page_index: 0,
+            feature_pages: Vec::new(),
         }
+    }
+
+    pub fn go_to_next_feature_page(&mut self) {
+        if self.feature_pages.is_empty() { return; }
+
+        if self.feature_page_index >= self.feature_pages.len() - 1 { return; }
+        self.feature_page_index += 1;
+    }
+
+    pub fn go_to_previous_feature_page(&mut self) {
+        if self.feature_pages.is_empty() { return; }
+
+        if self.feature_page_index == 0 { return; }
+        self.feature_page_index -= 1;
+    }
+
+    pub fn current_feature_page(&self) -> Vec<String> {
+        if self.feature_pages.is_empty() {
+            return Vec::new();
+        }
+
+        self.feature_pages[self.feature_page_index]
+            .iter()
+            .map(|line| line.clone())
+            .collect()
     }
 
     pub fn current_page_name(&self) -> String {
@@ -72,11 +104,57 @@ impl App {
     }
 
     pub fn run<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> Result<()> {
-        println!("{}", &self.current_page_name());
-
+        // running
         loop {
+            // pre-render
+            let footer_height = get_instructions_for(&self.current_page).len() as u16 + 2;
+            let header_height = 4;
+            let page_height = terminal.size()?.height - footer_height - header_height;
+
+
+
+            // assembling feature pages
+            // the pages of features
+            let mut new_feature_pages: Vec<Vec<String>> = Vec::new();
+            // the current page of features being assembled
+            let mut current_page: Vec<String> = Vec::new();
+            // how many lines have been used in the current page
+            let mut lines_used_in_current_page: u16 = 0;
+            // iterating through the features
+            for i in 0..self.body.features.len() {
+                // checks if a new page is needed
+                if lines_used_in_current_page + self.body.features[i].print_height() + 1 > page_height {
+                    new_feature_pages.push(current_page);
+                    current_page = Vec::new();
+                    lines_used_in_current_page = 0;
+                }
+                // adds the feature to the current page
+                let lines_to_add = self.body.features[i].summarize();
+                lines_used_in_current_page += lines_to_add.len() as u16 + 1;
+                current_page.push("".to_string());
+                current_page.extend(lines_to_add);
+            }
+            // adds the last page if it is not empty
+            if !current_page.is_empty() { new_feature_pages.push(current_page); }
+
+            // updates the feature page count in the app
+            let cloned_new_feature_pages: Vec<Vec<String>> = new_feature_pages
+                .iter()
+                .map(|line| line.clone())
+                .collect();
+            self.feature_pages = new_feature_pages;
+
+            // makes sure that the feature page index is valid
+            if !self.feature_pages.is_empty() {
+                if self.feature_page_index >= self.feature_pages.len() { self.feature_page_index = self.feature_pages.len() - 1; }
+            }
+
+
+
+            // rendering
             terminal.draw(|f| ui(f, self))?;
 
+            // getting input
             if let Event::Key(key) = event::read()? {
                 if key.kind == event::KeyEventKind::Release { continue; }
 
@@ -149,6 +227,18 @@ impl App {
                         // quits
                         if key.code == Instruction::quit_instruction().keybind {
                             self.current_page = Pages::Quitting;
+                            continue;
+                        }
+
+                        // goes to the previous feature page
+                        else if key.code == Instruction::previous_page().keybind {
+                            self.go_to_previous_feature_page();
+                            continue;
+                        }
+
+                        // goes to the next feature page
+                        else if key.code == Instruction::next_page().keybind {
+                            self.go_to_next_feature_page();
                             continue;
                         }
 
