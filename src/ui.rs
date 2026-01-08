@@ -32,7 +32,7 @@ pub mod standard {
 
 
 
-pub fn ui(frame: &mut Frame, app: &mut App) {
+pub fn ui(frame: &mut Frame, app: &App) {
     // header
     let header_block = Block::new().borders(Borders::ALL);
     let header = Paragraph::new(vec![
@@ -41,21 +41,23 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
     ]).block(header_block);
 
     // footer
+    let footer_height = get_instructions_for(&app.current_page).len() as u16 + 2;
     let footer_block = Block::new().borders(Borders::ALL);
     let instructions = get_instructions_for(&app.current_page);
-    let instructions_height = instructions.len() as u16 + 2;
     let footer = Paragraph::new(instructions).block(footer_block);
 
     // The sections of the screen.
     let leaflets = Layout::new(Direction::Vertical, [
         Constraint::Length(4), // header
         Constraint::Fill(1), // body
-        Constraint::Length(instructions_height), // footer
+        Constraint::Length(footer_height), // footer
     ]).split(frame.area());
 
     // rendering the header and footer
     frame.render_widget(header, leaflets[0]);
     frame.render_widget(footer, leaflets[2]);
+
+
 
     // body
     match app.current_page {
@@ -75,7 +77,8 @@ pub fn ui(frame: &mut Frame, app: &mut App) {
         }
 
         Pages::BodyView => {
-            let body = Paragraph::new(app.body.summarize());
+            let body_text = app.current_feature_page();
+            let body = Paragraph::new(body_text.iter().map(|s| Line::from(s.as_str())).collect::<Vec<_>>());
             frame.render_widget(body, leaflets[1]);
         }
 
@@ -190,6 +193,8 @@ impl Instruction {
     //      navigation
     pub fn confirm_instruction() -> Instruction { Instruction::new("ENTER".to_string(), "confirm".to_string(), KeyCode::Enter) }
     pub fn cancel_instruction() -> Instruction { Instruction::new("X".to_string(), "cancel".to_string(), KeyCode::Char('x')) }
+    pub fn next_page() -> Instruction { Instruction::new("⬇".to_string(), "next page".to_string(), KeyCode::Down) }
+    pub fn previous_page() -> Instruction { Instruction::new("⬆".to_string(), "previous page".to_string(), KeyCode::Up) }
     pub fn quit_instruction() -> Instruction { Instruction::new("Q".to_string(), "quit".to_string(), KeyCode::Char('q')) }
     //      body/feature management
     pub fn rename_instruction() -> Instruction { Instruction::new("N".to_string(), "rename body".to_string(), KeyCode::Char('n')) }
@@ -240,6 +245,8 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
 
         Pages::BodyView => {
             Instruction::in_groups(vec![
+                Instruction::previous_page(),
+                Instruction::next_page(),
                 Instruction::add_hole_instruction(),
                 Instruction::add_corner_instruction(),
                 Instruction::add_cutout_instruction(),
