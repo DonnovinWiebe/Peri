@@ -1,6 +1,8 @@
 use std::any::Any;
 use std::cmp::PartialEq;
 use ratatui::text::Line;
+use genpdf::{fonts, SimplePageDecorator};
+use genpdf::elements::Paragraph as PdfParagraph;
 
 /// The list of possible features.
 #[derive(Clone)]
@@ -426,8 +428,45 @@ impl Body {
 
         summary
     }
-}
 
+    /// Prints a pdf summary of the body.
+    pub fn print_pdf_summary(&self, project: String) -> Result<(), Box<dyn std::error::Error>> {
+        let font_family = fonts::from_files(
+            "./fonts",
+            "LiberationSans",
+            None
+        )?;
+        // pdf
+        let mut pdf = genpdf::Document::new(font_family);
+
+        // title
+        let title = format!("{} - {}", &project, &self.name);
+        pdf.set_title(&self.name);
+
+        // margins
+        let mut decorator = SimplePageDecorator::new();
+        decorator.set_margins(10);
+        pdf.set_page_decorator(decorator);
+
+        // building the page
+        let mut details = Vec::new();
+        details.push(title);
+        details.push("".to_string());
+        details.append(&mut self.summarize());
+        details.push("".to_string());
+        for feature in &self.features {
+            details.push("".to_string());
+            let feature_summary = feature.summarize();
+            details.extend(feature_summary);
+        }
+
+        for detail in details { pdf.push(PdfParagraph::new(detail)); }
+
+        // saving
+        pdf.render_to_file(&format!("./{} - {}.pdf", &project, &self.name))?;
+        Ok(())
+    }
+}
 
 
 /// A hole that adds to the body's overall perimeter.

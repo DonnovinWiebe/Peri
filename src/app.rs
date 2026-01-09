@@ -12,25 +12,29 @@ use crate::ui::{get_instructions_for, ui, Instruction};
 
 #[derive(Copy, Clone)]
 pub enum Pages {
-    Launching, // c
-    AddingBody, // c
-    BodyView, // c
-    RenamingBody, // c
-    ShowingHoleFeatureOptions, // c
-    ShowingCornerFeatureOptions, // c
-    ShowingCutoutFeatureOptions, // c
-    ShowingCircularFeatureOptions, // i
-    AddingFeature, // i
-    RemovingFeature, // i
-    ResettingBody, //i
-    FinishingBody, // i
-    Quitting, // i
+    Launching,
+    NamingProject,
+    AddingBody,
+    BodyView,
+    RenamingBody,
+    ShowingHoleFeatureOptions,
+    ShowingCornerFeatureOptions,
+    ShowingCutoutFeatureOptions,
+    ShowingCircularFeatureOptions,
+    AddingFeature,
+    RemovingFeature,
+    ResettingBody,
+    FinishingBody,
+    Quitting,
 }
 
 
 
 pub struct App {
-    pub body: Body<>,
+    pub project: String,
+    pub new_project_name: String,
+    pub is_project_name_set: bool,
+    pub body: Body,
     pub current_page: Pages,
     pub is_name_set: bool,
     pub is_width_set: bool,
@@ -46,6 +50,9 @@ pub struct App {
 impl App {
     pub fn new() -> App {
         App {
+            project: "".to_string(),
+            new_project_name: "".to_string(),
+            is_project_name_set: false,
             body: Body::new(),
             current_page: Pages::Launching,
             is_name_set: false,
@@ -84,19 +91,24 @@ impl App {
             .map(|line| line.clone())
             .collect()
     }
+    
+    pub fn get_current_page_number(&self) -> String {
+        format!("{}/{}", self.feature_page_index + 1, self.feature_pages.len())
+    }
 
     pub fn current_page_name(&self) -> String {
         match self.current_page {
             Pages::Launching => { "Launching".to_string() }
+            Pages::NamingProject => { "Naming Project".to_string() }
             Pages::AddingBody => { "Adding Body".to_string() }
-            Pages::BodyView => { "Body View".to_string() }
+            Pages::BodyView => { format!("Body View {}", self.get_current_page_number()) }
             Pages::RenamingBody => { "Renaming Body".to_string() }
             Pages::ShowingHoleFeatureOptions => { "Hole Feature Options".to_string() }
             Pages::ShowingCornerFeatureOptions => { "Corner Feature Options".to_string() }
             Pages::ShowingCutoutFeatureOptions => { "Cutout Feature Options".to_string() }
             Pages::ShowingCircularFeatureOptions => { "Circular Feature Options".to_string() }
             Pages::AddingFeature => { "Adding Feature".to_string() }
-            Pages::RemovingFeature => { "Removing Feature".to_string() }
+            Pages::RemovingFeature => { format!("Removing Feature {}", self.get_current_page_number()) }
             Pages::ResettingBody => { "Resetting Body".to_string() }
             Pages::FinishingBody => { "Finishing Body".to_string() }
             Pages::Quitting => { "Quitting".to_string() }
@@ -166,19 +178,39 @@ impl App {
 
                 match self.current_page {
                     Pages::Launching => {
-                        self.current_page = Pages::AddingBody;
+                        self.current_page = Pages::NamingProject;
                         continue;
                     }
 
-                    Pages::AddingBody => {
-                        // quits
-                        if key.code == Instruction::quit_instruction().keybind {
-                            self.current_page = Pages::Quitting;
+                    Pages::NamingProject => {
+                        // resets
+                        if key.code == Instruction::reset_instruction().keybind {
+                            self.new_project_name = "".to_string();
+                            self.is_project_name_set = false;
                             continue;
                         }
+                        
+                        // edits the new project name
+                        self.new_project_name = term_tools::keypad(&self.new_project_name, key);
 
-                        // cancels/resets
-                        if key.code == Instruction::cancel_instruction().keybind {
+                        // renames the project
+                        if key.code == Instruction::confirm_instruction().keybind {
+                            if self.new_project_name.is_empty() { continue; }
+                            self.is_project_name_set = true;
+                            self.project = self.new_project_name.clone();
+
+                            if self.is_name_set && self.is_width_set && self.is_height_set {
+                                self.current_page = Pages::BodyView;
+                            }
+                            else {
+                                self.current_page = Pages::AddingBody;
+                            }
+                        }
+                    }
+
+                    Pages::AddingBody => {
+                        // resets
+                        if key.code == Instruction::reset_instruction().keybind {
                             self.new_body_name = "".to_string();
                             self.new_body_width = "".to_string();
                             self.new_body_height = "".to_string();
@@ -219,7 +251,7 @@ impl App {
                         }
 
                         // creates a new body if both width and height are set
-                        if self.is_width_set && self.is_height_set {
+                        if self.is_name_set && self.is_width_set && self.is_height_set {
                             self.body = Body::new();
                             self.body.rename(self.new_body_name.clone());
                             self.body.set_width(self.new_body_width.parse::<f64>().unwrap_or(0.0));
@@ -278,6 +310,13 @@ impl App {
                             continue;
                         }
 
+                        // renames the project
+                        else if key.code == Instruction::rename_project_instruction().keybind {
+                            self.new_project_name = self.project.clone();
+                            self.current_page = Pages::NamingProject;
+                            continue;
+                        }
+
                         // renames a body
                         else if key.code == Instruction::rename_instruction().keybind {
                             self.new_body_name = self.body.name.clone();
@@ -305,6 +344,13 @@ impl App {
                     }
 
                     Pages::RenamingBody => {
+                        // resets
+                        if key.code == Instruction::reset_instruction().keybind {
+                            self.new_body_name = "".to_string();
+                            self.is_name_set = false;
+                            continue;
+                        }
+                        
                         // edits the new body name
                         self.new_body_name = term_tools::keypad(&self.new_body_name, key);
 
@@ -496,6 +542,7 @@ impl App {
 
                         // finishes the body
                         else if key.code == Instruction::confirm_instruction().keybind {
+                            self.body.print_pdf_summary(self.project.clone());
                             self.new_body_name = "".to_string();
                             self.new_body_width = "".to_string();
                             self.new_body_height = "".to_string();
