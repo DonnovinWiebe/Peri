@@ -37,6 +37,7 @@ pub fn ui(frame: &mut Frame, app: &App) {
     let header_block = Block::new().borders(Borders::ALL);
     let header = Paragraph::new(vec![
         Line::raw("PERI"),
+        Line::raw(app.project.as_str()),
         Line::raw(app.current_page_name()),
     ]).block(header_block);
 
@@ -48,7 +49,7 @@ pub fn ui(frame: &mut Frame, app: &App) {
 
     // The sections of the screen.
     let leaflets = Layout::new(Direction::Vertical, [
-        Constraint::Length(4), // header
+        Constraint::Length(5), // header
         Constraint::Fill(1), // body
         Constraint::Length(footer_height), // footer
     ]).split(frame.area());
@@ -63,6 +64,11 @@ pub fn ui(frame: &mut Frame, app: &App) {
     match app.current_page {
         Pages::Launching => {
             let body = Paragraph::new("Press any button to continue...");
+            frame.render_widget(body, leaflets[1]);
+        }
+
+        Pages::NamingProject => {
+            let body = Paragraph::new(format!("New Project Name: {}", &app.new_project_name));
             frame.render_widget(body, leaflets[1]);
         }
 
@@ -197,6 +203,7 @@ impl Instruction {
     pub fn previous_page() -> Instruction { Instruction::new("↑".to_string(), "previous page".to_string(), KeyCode::Up) }
     pub fn quit_instruction() -> Instruction { Instruction::new("Q".to_string(), "quit".to_string(), KeyCode::Char('q')) }
     //      body/feature management
+    pub fn rename_project_instruction() -> Instruction { Instruction::new("P".to_string(), "rename project".to_string(), KeyCode::Char('p')) }
     pub fn rename_instruction() -> Instruction { Instruction::new("N".to_string(), "rename body".to_string(), KeyCode::Char('n')) }
     pub fn finish_instruction() -> Instruction { Instruction::new("F".to_string(), "finish".to_string(), KeyCode::Char('f')) }
     pub fn reset_instruction() -> Instruction { Instruction::new("ESC".to_string(), "reset".to_string(), KeyCode::Esc) }
@@ -235,11 +242,17 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
             Instruction::in_groups(vec![], 4)
         }
 
+        Pages::NamingProject => {
+            Instruction::in_groups(vec![
+                Instruction::confirm_instruction(),
+                Instruction::reset_instruction(),
+            ], 4)
+        }
+
         Pages::AddingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
-                Instruction::cancel_instruction(),
-                Instruction::quit_instruction(),
+                Instruction::reset_instruction(),
             ], 4)
         }
 
@@ -252,6 +265,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::add_cutout_instruction(),
                 Instruction::add_circular_feature_instruction(),
                 Instruction::add_other_feature_instruction(),
+                Instruction::rename_project_instruction(),
                 Instruction::rename_instruction(),
                 Instruction::remove_feature_instruction(),
                 Instruction::finish_instruction(),
@@ -263,6 +277,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
         Pages::RenamingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
+                Instruction::reset_instruction(),
             ], 4)
         }
 
