@@ -193,8 +193,8 @@ impl Instruction {
     //      navigation
     pub fn confirm_instruction() -> Instruction { Instruction::new("ENTER".to_string(), "confirm".to_string(), KeyCode::Enter) }
     pub fn cancel_instruction() -> Instruction { Instruction::new("X".to_string(), "cancel".to_string(), KeyCode::Char('x')) }
-    pub fn next_page() -> Instruction { Instruction::new("⬇".to_string(), "next page".to_string(), KeyCode::Down) }
-    pub fn previous_page() -> Instruction { Instruction::new("⬆".to_string(), "previous page".to_string(), KeyCode::Up) }
+    pub fn next_page() -> Instruction { Instruction::new("↓".to_string(), "next page".to_string(), KeyCode::Down) }
+    pub fn previous_page() -> Instruction { Instruction::new("↑".to_string(), "previous page".to_string(), KeyCode::Up) }
     pub fn quit_instruction() -> Instruction { Instruction::new("Q".to_string(), "quit".to_string(), KeyCode::Char('q')) }
     //      body/feature management
     pub fn rename_instruction() -> Instruction { Instruction::new("N".to_string(), "rename body".to_string(), KeyCode::Char('n')) }
@@ -232,7 +232,7 @@ impl Instruction {
 pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
     return match page {
         Pages::Launching => {
-            Instruction::in_groups(vec![], 3)
+            Instruction::in_groups(vec![], 4)
         }
 
         Pages::AddingBody => {
@@ -240,7 +240,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
                 Instruction::quit_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::BodyView => {
@@ -257,13 +257,13 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::finish_instruction(),
                 Instruction::reset_instruction(),
                 Instruction::quit_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::RenamingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::ShowingHoleFeatureOptions => {
@@ -272,7 +272,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::add_capsular_hole_instruction(),
                 Instruction::add_rectangular_hole_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::ShowingCornerFeatureOptions => {
@@ -282,7 +282,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::add_slope_instruction(),
                 Instruction::add_cliff_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::ShowingCutoutFeatureOptions => {
@@ -292,7 +292,7 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::add_claw_instruction(),
                 Instruction::add_composite_slope_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::ShowingCircularFeatureOptions => {
@@ -300,41 +300,41 @@ pub fn get_instructions_for(page: &Pages) -> Vec<Line> {
                 Instruction::add_arc_instruction(),
                 Instruction::add_ellipse_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::AddingFeature => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::RemovingFeature => {
             Instruction::in_groups(vec![
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::ResettingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::FinishingBody => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
 
         Pages::Quitting => {
             Instruction::in_groups(vec![
                 Instruction::confirm_instruction(),
                 Instruction::cancel_instruction(),
-            ], 3)
+            ], 4)
         }
     }
 }

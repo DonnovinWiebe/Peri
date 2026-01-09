@@ -424,12 +424,6 @@ impl Body {
         summary.push(height);
         summary.push(perimeter);
 
-        for feature in &self.features {
-            let blank = "".to_string();
-            summary.push(blank);
-            summary.extend(feature.summarize());
-        }
-
         summary
     }
 }

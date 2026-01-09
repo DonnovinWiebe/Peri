@@ -116,10 +116,13 @@ impl App {
             // assembling feature pages
             // the pages of features
             let mut new_feature_pages: Vec<Vec<String>> = Vec::new();
-            // the current page of features being assembled
-            let mut current_page: Vec<String> = Vec::new();
             // how many lines have been used in the current page
             let mut lines_used_in_current_page: u16 = 0;
+            // the current page of features being assembled
+            let mut current_page: Vec<String> = Vec::new();
+            current_page.extend(self.body.summarize());
+            current_page.push("".to_string());
+            lines_used_in_current_page += self.body.summarize().len() as u16 + 1;
             // iterating through the features
             for i in 0..self.body.features.len() {
                 // checks if a new page is needed
@@ -127,6 +130,9 @@ impl App {
                     new_feature_pages.push(current_page);
                     current_page = Vec::new();
                     lines_used_in_current_page = 0;
+                    current_page.extend(self.body.summarize());
+                    current_page.push("".to_string());
+                    lines_used_in_current_page += self.body.summarize().len() as u16 + 1;
                 }
                 // adds the feature to the current page
                 let lines_to_add = self.body.features[i].summarize();
