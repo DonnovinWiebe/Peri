@@ -1,4 +1,4 @@
-'''
+```
 This is a simple terminal app that is used to find the perimeter of a complex shape from a part schematic.
 
 Steps:
@@ -138,4 +138,4 @@ Ellipse
 |                  |
 |                  |
 --------------------
-'''
+```
